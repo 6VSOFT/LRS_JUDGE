@@ -26,9 +26,9 @@ test('four-digit room, chosen seats, automatic blind deal, recovery and host con
    assert.equal((await get('state',h.code,'wrong')).status,403);
    assert.equal((await post('redeal',{code:h.code,token:first.token})).status,403);
    assert.equal((await post('dissolve',{code:h.code,token:first.token})).status,403);
-   assert.equal((await post('confirm',{code:h.code,token:first.token,round:1})).room.self.confirmed,true);
-   const redeal=await post('redeal',h);assert.equal(redeal.room.round,2);assert.equal(redeal.room.players.length,size);assert.ok(redeal.room.players.every(p=>!p.confirmed));
-   assert.equal((await post('confirm',{code:h.code,token:first.token,round:1})).status,409);
+   assert.equal((await post('confirm',{code:h.code,token:first.token,round:1})).status,404);
+   const redeal=await post('redeal',h);assert.equal(redeal.room.round,2);assert.equal(redeal.room.players.length,size);assert.ok(redeal.room.players.every(p=>!Object.hasOwn(p,'confirmed')));
+   assert.equal((await post('confirm',{code:h.code,token:first.token,round:1})).status,404);
    assert.equal((await get('state',h.code,first.token)).room.round,2);
    assert.equal((await post('dissolve',h)).dissolved,true);assert.equal((await get('state',h.code,first.token)).status,404);
   }

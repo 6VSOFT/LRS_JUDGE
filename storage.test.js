@@ -31,9 +31,9 @@ test('independent function instances preserve simultaneous seat claims and deal 
   assert.equal(privateStates.filter(p => p.room.self.role === '狼人').length, 4);
   assert.equal(privateStates.filter(p => p.room.self.role === '村民').length, 4);
   assert.ok(privateStates.every(p => p.room.players.every(seat => !seat.token && !seat.role)));
-  await Promise.all(players.map(p => client(store)('confirm', { code, token: p.token, round: 1 })));
-  const confirmed = await api('state', { code }, host.token);
-  assert.ok(confirmed.room.players.every(p => p.confirmed));
+  assert.ok(privateStates.every(p => !Object.hasOwn(p.room.self, 'confirmed')));
+  assert.ok(state.room.players.every(p => !Object.hasOwn(p, 'confirmed')));
+  assert.equal((await api('confirm', { code, token: players[0].token, round: 1 })).status, 404);
 });
 
 test('simultaneous claims cannot both own a seat; dissolved room cannot be resurrected', async () => {
