@@ -9,12 +9,36 @@ function client(store) {
     const response = await handleRequest(new Request('https://example.test/api/' + action + (read ? '?code=' + body.code : ''), {
       method: read ? 'GET' : 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: token },
-      ...(read ? {} : { body: JSON.stringify(body) }),
+      ...(read ? {} : { body: JSON.stringify(action === 'join' ? { name: '玩家', ...body } : body) }),
     }), store);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     return { status: response.status, ...await response.json() };
   };
 }
+
+test('names are required for new seats and preserved through recovery and redealing', async () => {
+  const api = client(new MemoryStore());
+  const host = await api('create', { size: 6 });
+  const code = host.room.code;
+  for (const name of [null, '', '   ', 123, '名'.repeat(21), '小\n明', '\u200b']) {
+    assert.equal((await api('join', { code, seat: 1, name })).status, 400);
+  }
+  assert.equal((await api('lookup', { code })).room.players.length, 0);
+  const name = '<小明 & 朋友>';
+  const player = await api('join', { code, seat: 1, name: `  ${name}  ` });
+  assert.equal(player.room.self.name, name);
+  assert.equal((await api('lookup', { code })).room.players[0].name, name);
+  const recovered = await api('join', { code, seat: 1, token: player.token, name: '' });
+  assert.equal(recovered.status, 200);
+  assert.equal(recovered.room.self.name, name);
+  for (let seat = 2; seat <= 6; seat++) await api('join', { code, seat, name: `朋友 ${seat}` });
+  const redeal = await api('redeal', { code, token: host.token });
+  assert.equal(redeal.room.players[0].name, name);
+  assert.ok(redeal.room.players.every(p => p.role && !p.token));
+  const self = await api('state', { code }, player.token);
+  assert.equal(self.room.self.name, name);
+  assert.ok(self.room.players.every(p => !p.role && !p.token));
+});
 
 test('independent function instances preserve simultaneous seat claims and deal once', async () => {
   const store = new MemoryStore();

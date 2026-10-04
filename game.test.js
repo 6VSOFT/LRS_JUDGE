@@ -5,7 +5,7 @@ test('four-digit room, chosen seats, automatic blind deal, recovery and host con
  const child=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:'3101'},stdio:'pipe'});
  try{
   await new Promise((resolve,reject)=>{child.stdout.once('data',resolve);child.once('error',reject);});
-  const post=async(action,data)=>{const r=await fetch('http://localhost:3101/api/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});return {status:r.status,...await r.json()};};
+  const post=async(action,data)=>{const r=await fetch('http://localhost:3101/api/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action==='join'?{name:'玩家',...data}:data)});return {status:r.status,...await r.json()};};
   const get=async(action,code,token='')=>{const r=await fetch('http://localhost:3101/api/'+action+'?code='+code,{headers:{Authorization:token}});return {status:r.status,...await r.json()};};
   for(const size of [6,9,12]){
    const host=await post('create',{size});assert.match(host.room.code,/^[1-9][0-9]{3}$/);const h={code:host.room.code,token:host.token};
