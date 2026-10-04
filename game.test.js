@@ -21,6 +21,9 @@ test('four-digit room, chosen seats, automatic blind deal, recovery and host con
    const roles=[];
    for(const p of players){const state=await get('state',h.code,p.token);roles.push(state.room.self.role);assert.ok(state.room.players.every(x=>!x.role&&!x.token));}
    assert.equal(roles.filter(r=>r==='狼人').length,size/3);assert.equal(roles.filter(r=>r==='村民').length,size/3);
+   const judge=await get('state',h.code,h.token);assert.equal(judge.room.host,true);
+   assert.equal(judge.room.players.length,size);assert.ok(judge.room.players.every(p=>p.role&&!p.token));
+   for(const p of players){const own=await get('state',h.code,p.token);assert.equal(judge.room.players.find(s=>s.seat===own.room.self.seat).role,own.room.self.role);}
    const lookup=await get('lookup',h.code);assert.equal(lookup.room.self,undefined);assert.ok(lookup.room.players.every(p=>!p.role&&!p.token));
    const recovered=await post('join',{code:h.code,seat:size,token:first.token});assert.equal(recovered.room.round,1);assert.equal(recovered.room.self.role,roles[0]);
    assert.equal((await get('state',h.code,'wrong')).status,403);
@@ -30,6 +33,7 @@ test('four-digit room, chosen seats, automatic blind deal, recovery and host con
    const redeal=await post('redeal',h);assert.equal(redeal.room.round,2);assert.equal(redeal.room.players.length,size);assert.ok(redeal.room.players.every(p=>!Object.hasOwn(p,'confirmed')));
    assert.equal((await post('confirm',{code:h.code,token:first.token,round:1})).status,404);
    assert.equal((await get('state',h.code,first.token)).room.round,2);
+   const newSelf=await get('state',h.code,first.token);assert.equal(redeal.room.players.find(p=>p.seat===size).role,newSelf.room.self.role);
    assert.equal((await post('dissolve',h)).dissolved,true);assert.equal((await get('state',h.code,first.token)).status,404);
   }
  }finally{child.kill();}

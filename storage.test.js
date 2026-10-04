@@ -27,10 +27,16 @@ test('independent function instances preserve simultaneous seat claims and deal 
   assert.equal(state.room.round, 1);
   assert.equal(state.room.phase, 'dealt');
   assert.equal(state.room.players.length, 12);
+  assert.ok(state.room.players.every(p => p.role && !p.token));
   const privateStates = await Promise.all(players.map(p => client(store)('state', { code }, p.token)));
   assert.equal(privateStates.filter(p => p.room.self.role === '狼人').length, 4);
   assert.equal(privateStates.filter(p => p.room.self.role === '村民').length, 4);
   assert.ok(privateStates.every(p => p.room.players.every(seat => !seat.token && !seat.role)));
+  for (const player of privateStates) {
+    assert.equal(state.room.players.find(p => p.seat === player.room.self.seat).role, player.room.self.role);
+  }
+  const publicState = await api('lookup', { code }, host.token);
+  assert.ok(publicState.room.players.every(p => !p.role && !p.token));
   assert.ok(privateStates.every(p => !Object.hasOwn(p.room.self, 'confirmed')));
   assert.ok(state.room.players.every(p => !Object.hasOwn(p, 'confirmed')));
   assert.equal((await api('confirm', { code, token: players[0].token, round: 1 })).status, 404);
