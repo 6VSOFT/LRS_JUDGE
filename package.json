@@ -1,1 +1,1 @@
-{"name":"forest-werewolf","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node server.js","test":"node --test"}}
+{"name":"forest-werewolf","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node server.js","test":"node --test"},"dependencies":{"@netlify/blobs":"^11.1.3"}}
