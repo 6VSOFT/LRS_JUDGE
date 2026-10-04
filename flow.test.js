@@ -92,12 +92,17 @@ test('votes are immutable, private until ended, counted with abstentions and con
   const player = await f.state(f.players[0].token);
   assert.equal(player.room.game.voting.ownVote, 1);
   assert.equal(player.room.game.voting.counts, undefined);
+  assert.equal(player.room.game.voting.sources, undefined);
+  assert.equal((await f.api('lookup', { code: f.code })).room.game.voting.sources, undefined);
   let host = await f.state();
   assert.equal(host.room.game.voting.counts[1], 3);
+  assert.deepEqual(host.room.game.voting.sources, { 1: [1, 2, 3], 2: [5] });
+  assert.deepEqual(host.room.game.voting.abstainers, [4, 6]);
   assert.equal(host.room.game.voting.submitted.length, 6);
   const result = await f.act('end-vote');
   assert.deepEqual(result.room.game.voting.leaders, [1]);
   assert.equal(result.room.game.voting.abstentions, 2);
+  assert.deepEqual((await f.state(f.players[0].token)).room.game.voting.sources, { 1: [1, 2, 3], 2: [5] });
   assert.equal(result.room.players[0].alive, true);
   assert.equal((await f.act('eliminate-vote')).room.players[0].alive, false);
   assert.equal((await f.act('eliminate-vote')).status, 409);
@@ -112,6 +117,7 @@ test('tie, no-vote, stale ballots, overrides, recovery and redeal are safe', asy
   await f.act('start-vote');
   const oldId = (await f.state()).room.game.voting.id;
   await f.vote(1, 2); await f.vote(2, 1);
+  assert.deepEqual((await f.state()).room.game.voting.unvoted, [3, 4, 5, 6]);
   assert.deepEqual((await f.act('end-vote')).room.game.voting.leaders, [1, 2]);
   assert.equal((await f.act('eliminate-vote')).status, 400);
   await f.act('start-vote');
