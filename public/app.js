@@ -12,7 +12,7 @@ function totalRoles(){return roleNames.reduce((sum,role)=>sum+roleConfig[role],0
 function setupError(){const total=totalRoles();if(total!==size)return total<size?`還需配置 ${size-total} 人`:`角色超出 ${total-size} 人`;const wolves=roleNames.filter(role=>wolfRoles.has(role)).reduce((sum,role)=>sum+roleConfig[role],0);if(wolves===0)return '至少需要 1 名狼人';if(wolves===size)return '至少需要 1 名好人';return '';}
 let page='home',code='',size=9,selectedSeat=null,room=null,session=null;
 let serverOffset=0,electionRefreshId=null;
-let playerName='', playerPanel='board', voteSelection=undefined, selectedVoteId=null;
+let playerName='', playerPanel='board', voteSelection=undefined, selectedVoteId=null, sheriffPrivilege=true;
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function validName(){const name=playerName.trim();return name.length>0&&[...name].length<=20&&!/[\p{Cc}\p{Cf}]/u.test(name);}
 let busy=false,polling=false,generation=0,holdTimer=null,holdId=null;
@@ -57,10 +57,10 @@ function voteAllowed(){const v=room.game?.voting;return room.self?.alive!==false
 function voteSources(v){
  if(!v?.sources)return '';
  const names=seats=>seats.length?seats.map(seat=>escapeHtml(seatLabel(seat))).join('、'):'無';
- return `<section class="vote-sources"><h3>${v.kind==='sheriff'?'警長':'放逐'}投票來源</h3>${room.players.map(p=>`<div class="vote-source-row"><strong>${escapeHtml(seatLabel(p.seat))} <span>${v.counts?.[p.seat]||0} 票</span></strong><p>投票者：${names(v.sources[p.seat]||[])}</p></div>`).join('')}<div class="vote-source-row"><strong>棄權</strong><p>${names(v.abstainers||[])}</p></div><div class="vote-source-row"><strong>未投票</strong><p>${names(v.unvoted||[])}</p></div>${v.excluded?.length?`<div class="vote-source-row"><strong>平票禁投（不計入未投票）</strong><p>${names(v.excluded)}</p></div>`:''}</section>`;
+ return `<section class="vote-sources"><h3>${v.kind==='sheriff'?'警長':'放逐'}投票來源</h3>${room.players.map(p=>`<div class="vote-source-row"><strong>${escapeHtml(seatLabel(p.seat))} <span>${v.counts?.[p.seat]||0} 票</span></strong><p>投票者：${(v.sources[p.seat]||[]).map(seat=>escapeHtml(seatLabel(seat))+'（'+(v.weights?.[seat]??1)+' 票）').join('、')||'無'}</p></div>`).join('')}<div class="vote-source-row"><strong>棄權</strong><p>${names(v.abstainers||[])}</p></div><div class="vote-source-row"><strong>未投票</strong><p>${names(v.unvoted||[])}</p></div>${v.excluded?.length?`<div class="vote-source-row"><strong>平票禁投（不計入未投票）</strong><p>${names(v.excluded)}</p></div>`:''}</section>`;
 }
 function voteResult(v){
- if(v?.status==='cancelled')return '<div class="notice">玩家存活狀態已變更，本輪投票作廢。請等待法官重新發起。</div>';
+ if(v?.status==='cancelled')return '<div class="notice">玩家狀態或警徽已變更，本輪投票作廢。請等待法官重新發起。</div>';
  if(v?.status!=='ended')return '';
  if(v.kind==='sheriff')return `<div class="vote-result"><strong>${v.winner?escapeHtml(seatLabel(v.winner))+' 當選警長，已自動授予警徽':(v.leaders?.length>1?'警長票平票：'+v.leaders.join('、')+' 號，請法官安排重投':'無有效警長票，未授予警徽')}</strong><p>已投 ${v.submitted.length} / ${v.eligible.length} 人 · 棄權 ${v.abstentions} 票</p>${voteSources(v)}</div>`;
  const leaders=v.leaders||[],lead=leaders.length===0?'無有效得票，本輪無人出局':leaders.length>1?`平票：${leaders.map(n=>n+' 號').join('、')}，上述玩家下次重投暫停投票權`:`最高票：${escapeHtml(seatLabel(leaders[0]))}`;
@@ -68,7 +68,7 @@ function voteResult(v){
 }
 function gameScreen(){
  const g=room.game,v=g.voting,host=room.host,alive=room.players.filter(p=>p.alive).length;
- if(selectedVoteId!==v?.id){selectedVoteId=v?.id;voteSelection=undefined;}
+ if(selectedVoteId!==v?.id){selectedVoteId=v?.id;voteSelection=undefined;sheriffPrivilege=true;}
  if(voteSelection!=null&&!room.players.some(p=>p.seat===voteSelection&&p.alive))voteSelection=undefined;
  if(!host&&room.self.alive===false)playerPanel='board';
  return `<section class="game-shell ${!host&&room.self.alive===false?'spectator':''}"><div class="game-meta"><span>${host?'法官全知視角':'玩家看板'} · 房間 ${room.code} · 第 ${room.round} 局</span><span>存活 ${alive} / ${room.size}</span></div><div class="phase-banner ${g.stage.type==='night'?'night-banner':''}"><div><span class="eyebrow">${host?'PHASE '+(g.step+1)+' / 13':'CURRENT PHASE'}</span><h1>${g.stage.label}</h1><p>${host?'全場底牌僅法官可見，請勿展示螢幕。':escapeHtml(seatLabel(room.self.seat))+(room.self.alive?' · 存活':' · 已出局，僅可觀戰')}</p></div><span class="phase-icon">${g.stage.type==='night'?'☾':g.stage.type==='election'?'♔':'☀'}</span></div>${host?hostControls():playerControls()}<div class="board-heading"><h2>${host?'全場玩家':'玩家列表'}</h2><span>♔ ${g.sheriff?escapeHtml(seatLabel(g.sheriff)):'尚未指定警長'}</span></div><div class="game-grid">${room.players.map(p=>gamePlayer(p,host)).join('')}</div>${!host?playerVoteBar():''}${voteResult(v)}${host&&v?.status==='active'?voteSources(v):''}${host?`<details class="game-history"><summary>主持紀錄（${g.history.length}）</summary>${g.history.map(item=>`<p><small>${item.stage}</small> ${escapeHtml(item.text)}</p>`).join('')||'<p>尚無操作紀錄</p>'}</details><button class="secondary full" data-action="manage">重新發牌 / 解散房間</button>`:''}</section>`;
@@ -76,7 +76,7 @@ function gameScreen(){
 function exclusionNotice(){const v=room.game.voting,seats=v?.status==='active'?v.excluded:room.game.nextVoteExcluded;return seats?.length?`<p class="notice">平票禁投：${seats.map(n=>escapeHtml(seatLabel(n))).join('、')}。${v?.status==='active'?'本次':'下次'}重投不可投票，仍可被投。</p>`:'';}
 function hostControls(){
  const g=room.game,v=g.voting,night=g.night;
- return `<div class="phase-actions"><button class="secondary" data-action="g-prev" ${g.step===0||v?.status==='active'?'disabled':''}>← 回退上一階段</button><button class="primary" data-action="g-next" ${g.step===12||v?.status==='active'?'disabled':''}>${g.step===12?'已到第 6 天':`進入下個階段：${stageLabels[g.step+1]} →`}</button></div>${v?.status==='active'?'<p class="hint">投票進行中，請先結束投票再推進流程。</p>':''}<section class="control-panel">${g.stage.type==='night'?`<h2>☾ 狼人刀人 · 暫存區</h2><p>${night.settled?'本晚已公布。若需修正，請操作玩家的出局／恢復按鈕。':'選擇目標後僅法官可見；公布結算或進入下一階段時才生效。神職救人時可清空目標。'}</p><div class="target-options">${room.players.filter(p=>p.alive).map(p=>`<button class="target-chip ${night.target===p.seat?'selected':''}" data-action="g-night" data-seat="${p.seat}" aria-pressed="${night.target===p.seat}" ${night.settled?'disabled':''}>${p.seat} 號 ${escapeHtml(p.name||'')}</button>`).join('')}</div><div class="panel-footer"><strong>${night.settled?'已公布':`暫存：${night.target?escapeHtml(seatLabel(night.target)):'平安夜'}`}</strong><button class="text-button" data-action="g-clear-night" ${night.settled?'disabled':''}>清空目標</button><button class="primary" data-action="g-settle-night" ${night.settled?'disabled':''}>公布夜間結算</button></div>`:g.stage.type==='election'?electionPanel(true):`<h2>☀ 全員放逐投票</h2><p>具投票資格的存活玩家一票，可投自己或棄權。提交後無法更改。</p>${exclusionNotice()}${v?.status==='active'?`<div class="panel-footer"><strong>已投 ${v.submitted.length} / ${v.eligible.length} 人</strong><button class="primary" data-action="g-end-vote">結束投票</button></div>`:'<button class="primary full" data-action="g-start-vote">發起投票</button>'}`}</section>${g.sheriff?'<button class="text-button" data-action="g-clear-sheriff">收回警徽</button>':''}`;
+ return `<div class="phase-actions"><button class="secondary" data-action="g-prev" ${g.step===0||v?.status==='active'?'disabled':''}>← 回退上一階段</button><button class="primary" data-action="g-next" ${g.step===12||v?.status==='active'?'disabled':''}>${g.step===12?'已到第 6 天':`進入下個階段：${stageLabels[g.step+1]} →`}</button></div>${v?.status==='active'?'<p class="hint">投票進行中，請先結束投票再推進流程。</p>':''}<section class="control-panel">${g.stage.type==='night'?`<h2>☾ 狼人刀人 · 暫存區</h2><p>${night.settled?'本晚已公布。若需修正，請操作玩家的出局／恢復按鈕。':'選擇目標後僅法官可見；公布結算或進入下一階段時才生效。神職救人時可清空目標。'}</p><div class="target-options">${room.players.filter(p=>p.alive).map(p=>`<button class="target-chip ${night.target===p.seat?'selected':''}" data-action="g-night" data-seat="${p.seat}" aria-pressed="${night.target===p.seat}" ${night.settled?'disabled':''}>${p.seat} 號 ${escapeHtml(p.name||'')}</button>`).join('')}</div><div class="panel-footer"><strong>${night.settled?'已公布':`暫存：${night.target?escapeHtml(seatLabel(night.target)):'平安夜'}`}</strong><button class="text-button" data-action="g-clear-night" ${night.settled?'disabled':''}>清空目標</button><button class="primary" data-action="g-settle-night" ${night.settled?'disabled':''}>公布夜間結算</button></div>`:g.stage.type==='election'?electionPanel(true):`<h2>☀ 全員放逐投票</h2><p>具投票資格的存活玩家一票；警長可選擇 1.5 票。可投自己或棄權。提交後無法更改。</p>${exclusionNotice()}${v?.status==='active'?`<div class="panel-footer"><strong>已投 ${v.submitted.length} / ${v.eligible.length} 人</strong><button class="primary" data-action="g-end-vote">結束投票</button></div>`:'<button class="primary full" data-action="g-start-vote">發起投票</button>'}`}</section>${g.sheriff?'<button class="text-button" data-action="g-clear-sheriff">收回警徽</button>':''}`;
 }
 function playerControls(){
  const v=room.game.voting;
@@ -94,8 +94,9 @@ function gamePlayer(p,host){
 function playerVoteBar(){
  const v=room.game.voting;
  if(v?.status!=='active')return '';
- if(!voteAllowed())return `<div class="vote-submit locked">${room.self.alive===false?'已出局 · 僅可觀戰':!v.eligible.includes(room.self.seat)?(v.kind==='sheriff'?'上警玩家無警長票 · 等待投票結束':'平票禁投 · 等待本次重投結束'):'已投票（等待其他人）'}</div>`;
- return `<div class="vote-submit"><strong>${voteSelection===undefined?'請選擇玩家或棄權':voteSelection===null?'已選擇棄權':`選中 ${voteSelection} 號玩家`}</strong><div><button class="secondary ${voteSelection===null?'selected':''}" data-action="g-abstain" aria-pressed="${voteSelection===null}">棄權</button><button class="primary" data-action="g-submit-vote" ${voteSelection===undefined?'disabled':''}>確認投票</button></div></div>`;
+ if(!voteAllowed())return `<div class="vote-submit locked">${room.self.alive===false?'已出局 · 僅可觀戰':!v.eligible.includes(room.self.seat)?(v.kind==='sheriff'?'上警玩家無警長票 · 等待投票結束':'平票禁投 · 等待本次重投結束'):`已投票（等待其他人）${v.ownVote===null?' · 已棄權':' · 本票計 '+(v.ownWeight??1)+' 票'}`}</div>`;
+ const privilege=v.kind!=='sheriff'&&room.game.sheriff===room.self.seat;
+ return `${privilege?`<section class="control-panel"><h2>♔ 警徽特權</h2><p>本次放逐票：${sheriffPrivilege?'1.5':'1'} 票。提交前可切換，提交後鎖定。</p><div class="target-options"><button class="target-chip ${sheriffPrivilege?'selected':''}" data-action="g-privilege" data-value="yes" aria-pressed="${sheriffPrivilege}">是 · 1.5 票</button><button class="target-chip ${!sheriffPrivilege?'selected':''}" data-action="g-privilege" data-value="no" aria-pressed="${!sheriffPrivilege}">否 · 1 票</button></div></section>`:''}<div class="vote-submit"><strong>${voteSelection===undefined?'請選擇玩家或棄權':voteSelection===null?'已選擇棄權':`選中 ${voteSelection} 號玩家`}</strong><div><button class="secondary ${voteSelection===null?'selected':''}" data-action="g-abstain" aria-pressed="${voteSelection===null}">棄權</button><button class="primary" data-action="g-submit-vote" ${voteSelection===undefined?'disabled':''}>確認投票</button></div></div>`;
 }
 function gameConfirm(title,message,submit){
  if(document.querySelector('dialog'))return;
@@ -112,6 +113,7 @@ async function sendGame(action,payload){
 }
 function gameAction(button){
  const action=button.dataset.action,g=room.game;
+ if(action==='g-privilege'){if(voteAllowed()&&g.voting.kind!=='sheriff'&&g.sheriff===room.self.seat){sheriffPrivilege=button.dataset.value==='yes';render();}return;}
  if(action==='g-board'){playerPanel='board';render();return;}
  if(action==='g-card'){if(room.self.alive===false)return;playerPanel='card';render();return;}
  if(action==='g-select-vote'||action==='g-abstain'){if(!voteAllowed())return;voteSelection=action==='g-abstain'?null:Number(button.dataset.seat);render();return;}
@@ -120,7 +122,8 @@ function gameAction(button){
  if(action==='g-submit-vote'){
   if(!voteAllowed()||voteSelection===undefined)return;
   const target=voteSelection,voteId=g.voting.id;
-  confirm('確認投票',`${target===null?'確定棄權嗎？':`確定將${g.voting.kind==='sheriff'?'警長票':'票'}投給 ${target} 號玩家嗎？`}提交後不可更改。`,'vote',{target,voteId});return;
+  const privilege=g.voting.kind!=='sheriff'&&g.sheriff===room.self.seat;
+  confirm('確認投票',`${target===null?'確定棄權嗎？':`確定將${g.voting.kind==='sheriff'?'警長票':'票'}投給 ${target} 號玩家嗎？本票計 ${privilege&&sheriffPrivilege?1.5:1} 票。`}提交後不可更改。`,'vote',{target,voteId,...(privilege?{sheriffPrivilege}:{})});return;
  }
  if(!room.host)return;
  const seat=Number(button.dataset.seat);
@@ -132,7 +135,7 @@ function gameAction(button){
  }else if(action==='g-night'||action==='g-clear-night')run(()=>sendGame('night',{...stamp,seat:action==='g-clear-night'?null:seat}));
  else if(action==='g-settle-night')confirm('公布夜間結算',`確定公布${g.night.target?g.night.target+' 號出局':'平安夜'}？公布後所有玩家會看到存活狀態。`,'settle-night');
  else if(action==='g-status'){const alive=button.dataset.alive==='true';confirm(alive?'恢復存活':'手動出局',`確定將 ${seatLabel(seat)} 設為${alive?'存活':'出局'}嗎？${g.voting?.status==='active'?'這會將當前投票作廢，需重新發起。':''}`,'status',{seat,alive});}
- else if(action==='g-sheriff'||action==='g-clear-sheriff')confirm('警徽標記',action==='g-clear-sheriff'?'確定收回警徽？':`確定授予 ${seatLabel(seat)} 警徽？`,'sheriff',{seat:action==='g-clear-sheriff'?null:seat});
+ else if(action==='g-sheriff'||action==='g-clear-sheriff')confirm('警徽標記',action==='g-clear-sheriff'?'確定收回警徽？投票進行中會作廢本輪，需重新發起。':`確定授予 ${seatLabel(seat)} 警徽？投票進行中會作廢本輪，需重新發起。`,'sheriff',{seat:action==='g-clear-sheriff'?null:seat});
  else if(action==='g-start-vote')confirm('發起投票',g.stage.type==='election'?'重新開放警長投票，上警玩家沒有警長票，僅可投候選人。':`向具資格的存活玩家開放投票。${g.nextVoteExcluded?.length?'平票玩家 '+g.nextVoteExcluded.join('、')+' 號本次禁投，仍可被投。':''}新投票將取代上一輪結果。`,'start-vote');
  else if(action==='g-end-vote')confirm('結束投票',`目前 ${g.voting.submitted.length} / ${g.voting.eligible.length} 人已投。確定結束並公布結果？未投玩家不計票。`,'end-vote');
  else if(action==='g-eliminate-vote')confirm('確認投票出局',`確定淘汰 ${seatLabel(g.voting.leaders[0])}？`,'eliminate-vote');

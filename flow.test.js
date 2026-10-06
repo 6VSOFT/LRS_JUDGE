@@ -34,9 +34,9 @@ async function fixture() {
     const s = await state();
     return api('nominate', { code, token: players[seat - 1].token, round: s.room.round, electionId: electionId ?? s.room.game.election.id, choice });
   };
-  const vote = async (seat, target, id) => {
+  const vote = async (seat, target, id, extra = {}) => {
     const s = await state();
-    return api('vote', { code, token: players[seat - 1].token, round: s.room.round, voteId: id ?? s.room.game.voting.id, target });
+    return api('vote', { code, token: players[seat - 1].token, round: s.room.round, voteId: id ?? s.room.game.voting.id, target, ...extra });
   };
   return { api, code, host, players, state, act, day, vote, expireElection, nominate };
 }
@@ -62,6 +62,38 @@ test('13-stage flow, election, bounds and stale host commands are enforced', asy
   assert.equal((await f.act('stage', { direction: -1 })).room.game.step, 11);
   const denied = await f.api('status', { code: f.code, token: f.players[0].token, round: 1, revision: 0, seat: 2, alive: false });
   assert.equal(denied.status, 403);
+});
+
+test('sheriff exile privilege defaults to 1.5, supports opting out and locks weighted results', async () => {
+  const f = await fixture();
+  await f.day(); await f.act('sheriff', { seat: 1 }); await f.act('start-vote');
+  assert.equal((await f.vote(2, 3, undefined, { sheriffPrivilege: true })).status, 403);
+  assert.equal((await f.vote(1, 3, undefined, { sheriffPrivilege: 'yes' })).status, 400);
+  await f.vote(1, 3); await f.vote(2, 4);
+  const host = await f.state();
+  assert.equal(host.room.game.voting.counts[3], 1.5);
+  assert.equal(host.room.game.voting.counts[4], 1);
+  assert.equal((await f.state(f.players[0].token)).room.game.voting.ownWeight, 1.5);
+  assert.equal((await f.state(f.players[1].token)).room.game.voting.weights, undefined);
+  assert.equal((await f.vote(1, 4, undefined, { sheriffPrivilege: false })).status, 409);
+  assert.deepEqual((await f.act('end-vote')).room.game.voting.leaders, [3]);
+  await f.act('sheriff', { seat: 2 });
+  assert.equal((await f.state()).room.game.voting.counts[3], 1.5); // Badge transfer never rewrites a submitted ballot.
+  await f.act('start-vote');
+  await f.vote(2, 3, undefined, { sheriffPrivilege: false }); await f.vote(1, 4);
+  const tie = await f.act('end-vote');
+  assert.deepEqual(tie.room.game.voting.leaders, [3, 4]);
+  assert.equal(tie.room.game.voting.weights[2], 1);
+  await f.act('start-vote');
+  await f.vote(2, null);
+  const abstain = await f.act('end-vote');
+  assert.equal(abstain.room.game.voting.abstentions, 1);
+  assert.deepEqual(abstain.room.game.voting.counts, {});
+  await f.act('start-vote'); await f.vote(2, 1);
+  assert.equal((await f.act('sheriff', { seat: 1 })).room.game.voting.status, 'cancelled');
+  await f.act('start-vote');
+  await f.vote(1, 3);
+  assert.equal((await f.state()).room.game.voting.counts[3], 1.5);
 });
 
 test('night targets stay private, clearing saves players, settling is applied once', async () => {
