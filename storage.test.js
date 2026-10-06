@@ -169,3 +169,27 @@ test('nine additional roles deal and redeal with special wolves counted as the w
   }
   assert.equal((await api('create', { size: 6, roles: { 白痴: 1, 騎士: 1, 魔術師: 1, 攝夢人: 1, 守墓人: 1, 村民: 1 } })).status, 400);
 });
+
+test('five latest roles support dealing, redealing and correct wolf camp validation', async () => {
+  const api = client(new MemoryStore());
+  const roles = { 狼美人: 1, 夢魘: 1, 血月使徒: 1, 獵魔人: 1, 通靈師: 1, 村民: 1 };
+  const host = await api('create', { size: 6, roles });
+  assert.equal(host.status, 200);
+  const code = host.room.code;
+  const players = [];
+  for (let seat = 1; seat <= 6; seat++) players.push(await api('join', { code, seat }));
+  for (let round = 1; round <= 2; round++) {
+    const state = round === 1 ? await api('state', { code }, host.token) : await api('redeal', { code, token: host.token });
+    assert.deepEqual(state.room.players.map(p => p.role).sort(), Object.keys(roles).sort());
+    for (const player of players) {
+      const self = await api('state', { code }, player.token);
+      assert.equal(self.room.self.role, state.room.players.find(p => p.seat === self.room.self.seat).role);
+      assert.ok(self.room.players.every(p => !p.role));
+    }
+  }
+  for (const role of ['狼美人', '夢魘', '血月使徒']) {
+    assert.equal((await api('create', { size: 6, roles: { [role]: 1, 村民: 5 } })).status, 200);
+    assert.equal((await api('create', { size: 6, roles: { [role]: 6 } })).status, 400);
+  }
+  assert.equal((await api('create', { size: 6, roles: { 獵魔人: 3, 通靈師: 3 } })).status, 400);
+});
