@@ -23,12 +23,22 @@ async function fixture() {
     const s = await state();
     return api(action, { code, token: host.token, round: s.room.round, revision: s.room.game.revision, ...extra });
   };
-  const day = async () => { await act('stage', { direction: 1 }); await act('stage', { direction: 1 }); };
+  const expireElection = async () => {
+    const current = await store.read(code);
+    current.data.game.election.deadline = Date.now() - 1;
+    await store.write(code, current.data, current.etag);
+    return state();
+  };
+  const day = async () => { await act('stage', { direction: 1 }); await expireElection(); await act('stage', { direction: 1 }); };
+  const nominate = async (seat, choice, electionId) => {
+    const s = await state();
+    return api('nominate', { code, token: players[seat - 1].token, round: s.room.round, electionId: electionId ?? s.room.game.election.id, choice });
+  };
   const vote = async (seat, target, id) => {
     const s = await state();
     return api('vote', { code, token: players[seat - 1].token, round: s.room.round, voteId: id ?? s.room.game.voting.id, target });
   };
-  return { api, code, host, players, state, act, day, vote };
+  return { api, code, host, players, state, act, day, vote, expireElection, nominate };
 }
 
 test('13-stage flow, election, bounds and stale host commands are enforced', async () => {
@@ -40,7 +50,8 @@ test('13-stage flow, election, bounds and stale host commands are enforced', asy
   const race = await Promise.all([f.api('stage', command), f.api('stage', command)]);
   assert.deepEqual(race.map(r => r.status).sort(), [200, 409]);
   assert.equal((await f.state()).room.game.stage.type, 'election');
-  assert.equal((await f.act('start-vote')).status, 400);
+  assert.equal((await f.act('start-vote')).status, 409);
+  await f.expireElection();
   assert.equal((await f.act('sheriff', { seat: 3 })).room.game.sheriff, 3);
   for (let step = 2; step < 13; step++) {
     s = await f.act('stage', { direction: 1 });
@@ -69,6 +80,7 @@ test('night targets stay private, clearing saves players, settling is applied on
   await f.act('stage', { direction: -1 });
   assert.equal((await f.act('night', { seat: 4 })).status, 400);
   await f.act('stage', { direction: 1 });
+  await f.expireElection();
   await f.act('stage', { direction: 1 });
   await f.act('stage', { direction: 1 });
   await f.act('night', { seat: 4 });
@@ -176,4 +188,94 @@ test('repeated ties replace excluded seats and all-tied or zero-vote rounds are 
   for (let seat = 1; seat <= 6; seat++) await f.vote(seat, seat);
   await f.act('end-vote');
   assert.equal((await f.act('start-vote')).status, 400);
+});
+
+test('sheriff signup has one server deadline, defaults no, and awards a unique winner automatically', async () => {
+  const f = await fixture();
+  const started = await f.act('stage', { direction: 1 });
+  const e = started.room.game.election;
+  assert.ok(e.deadline - started.serverTime > 9900 && e.deadline - started.serverTime <= 10000);
+  assert.equal((await f.act('stage', { direction: 1 })).status, 400);
+  assert.equal((await f.act('sheriff', { seat: 1 })).status, 400);
+  assert.equal((await f.nominate(1, true)).status, 200);
+  assert.equal((await f.nominate(1, false)).status, 409);
+  assert.equal((await f.nominate(2, true)).status, 200);
+  assert.equal((await f.nominate(3, false)).status, 200);
+  assert.equal((await f.nominate(4, 'yes')).status, 400);
+  const recovered = (await f.state(f.players[0].token)).room.game.election;
+  assert.equal(recovered.deadline, e.deadline);
+  assert.equal(recovered.ownChoice, true);
+  assert.equal(recovered.answers, undefined);
+  const expired = await f.expireElection();
+  assert.deepEqual(expired.room.game.voting.eligible, [3, 4, 5, 6]);
+  assert.deepEqual(expired.room.game.voting.candidates, [1, 2]);
+  assert.equal((await f.state(f.players[5].token)).room.game.election.ownChoice, false);
+  assert.equal((await f.nominate(6, true)).status, 409);
+  const reads = await Promise.all(Array.from({ length: 8 }, () => f.state()));
+  assert.ok(reads.every(r => r.room.game.voting.id === expired.room.game.voting.id));
+  assert.equal((await f.vote(1, 2)).status, 403);
+  assert.equal((await f.vote(3, 4)).status, 400);
+  assert.equal((await f.vote(3, 1)).status, 200);
+  assert.equal((await f.vote(3, 2)).status, 409);
+  assert.equal((await f.state(f.players[3].token)).room.game.voting.sources, undefined);
+  await Promise.all([f.vote(4, 1), f.vote(5, 2), f.vote(6, null)]);
+  const result = (await f.state()).room;
+  assert.equal(result.game.voting.status, 'ended');
+  assert.equal(result.game.sheriff, 1);
+  assert.equal(result.game.voting.winner, 1);
+  assert.deepEqual(result.game.voting.sources, { 1: [3, 4], 2: [5] });
+  assert.ok(result.players.every(p => p.alive));
+  assert.equal((await f.act('eliminate-vote')).status, 400);
+  assert.equal((await f.state(f.players[5].token)).room.game.sheriff, 1);
+  assert.equal((await f.act('stage', { direction: 1 })).room.game.step, 2);
+});
+
+test('sheriff ties, no candidates, all candidates and all abstentions never assign an arbitrary badge', async () => {
+  for (const count of [0, 6]) {
+    const f = await fixture();
+    await f.act('stage', { direction: 1 });
+    for (let seat = 1; seat <= count; seat++) await f.nominate(seat, true);
+    const r = await f.expireElection();
+    assert.equal(r.room.game.sheriff, null);
+    assert.equal(r.room.game.voting.status, 'ended');
+    assert.equal((await f.act('stage', { direction: 1 })).status, 200);
+  }
+  const f = await fixture();
+  await f.act('stage', { direction: 1 });
+  for (const seat of [1, 2, 3]) await f.nominate(seat, true);
+  await f.expireElection();
+  await f.vote(4, 1); await f.vote(5, 2); await f.vote(6, null);
+  assert.equal((await f.state()).room.game.election.status, 'tie');
+  const retry = await f.act('start-vote');
+  assert.equal(retry.room.game.sheriff, null);
+  assert.deepEqual(retry.room.game.voting.candidates, [1, 2]);
+  assert.deepEqual(retry.room.game.voting.eligible, [4, 5, 6]);
+  assert.equal((await f.vote(3, 1)).status, 403);
+  assert.equal((await f.vote(4, 3)).status, 400);
+  await f.vote(4, null); await f.vote(5, null); await f.vote(6, null);
+  assert.equal((await f.state()).room.game.sheriff, null);
+  await f.act('start-vote'); await f.vote(4, 2);
+  assert.equal((await f.act('end-vote')).room.game.sheriff, 2);
+});
+
+test('sheriff election handles dead players, cancellation, reentry and stale nominations', async () => {
+  const f = await fixture();
+  await f.act('status', { seat: 6, alive: false });
+  await f.act('stage', { direction: 1 });
+  const oldId = (await f.state()).room.game.election.id;
+  assert.equal((await f.nominate(6, true)).status, 403);
+  await f.nominate(1, true); await f.nominate(2, true);
+  await f.expireElection();
+  await f.vote(3, 1); await f.vote(4, 2);
+  await f.act('status', { seat: 2, alive: false });
+  assert.equal((await f.state()).room.game.election.status, 'cancelled');
+  const restarted = await f.act('start-vote');
+  assert.deepEqual(restarted.room.game.voting.candidates, [1]);
+  assert.deepEqual(restarted.room.game.voting.eligible, [3, 4, 5]);
+  await f.act('end-vote');
+  await f.act('stage', { direction: -1 }); await f.act('stage', { direction: 1 });
+  assert.notEqual((await f.state()).room.game.election.id, oldId);
+  assert.equal((await f.nominate(3, true, oldId)).status, 409);
+  const redeal = await f.api('redeal', { code: f.code, token: f.host.token });
+  assert.equal(redeal.room.game.election, null);
 });
