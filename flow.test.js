@@ -226,7 +226,7 @@ test('sheriff signup has one server deadline, defaults no, and awards a unique w
   const f = await fixture();
   const started = await f.act('stage', { direction: 1 });
   const e = started.room.game.election;
-  assert.ok(e.deadline - started.serverTime > 9900 && e.deadline - started.serverTime <= 10000);
+  assert.ok(e.deadline - started.serverTime > 14900 && e.deadline - started.serverTime <= 15000);
   assert.equal((await f.act('stage', { direction: 1 })).status, 400);
   assert.equal((await f.act('sheriff', { seat: 1 })).status, 400);
   assert.equal((await f.nominate(1, true)).status, 200);

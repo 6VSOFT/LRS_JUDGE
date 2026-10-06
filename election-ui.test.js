@@ -18,7 +18,7 @@ test('phase sync interrupts an existing dialog and shows one election prompt wit
     },
   };
   const room = { code: '1234', round: 1, self: { seat: 1, alive: true }, game: { step: 1,
-    election: { id: 'election-1', status: 'signup', deadline: Date.now() + 10000, participants: [1] } } };
+    election: { id: 'election-1', status: 'signup', deadline: Date.now() + 15000, participants: [1] } } };
   const context = vm.createContext({ document, window: { addEventListener() {} }, localStorage: { getItem: () => null },
     setTimeout() {}, clearTimeout() {}, setInterval() {}, navigator: {}, console, AbortSignal,
     fetch: async () => ({ ok: true, json: async () => ({ room: structuredClone(room), serverTime: Date.now() }) }) });
