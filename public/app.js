@@ -85,8 +85,8 @@ function playerControls(){
  return `<div class="player-toolbar"><p role="status">${text}</p><button class="secondary" data-action="g-card" ${room.self.alive===false?'disabled':''}>查看我的底牌</button></div>`;
 }
 function gamePlayer(p,host){
- const g=room.game,v=g.voting,selected=voteSelection===p.seat,canVote=voteAllowed(),status=v?.status==='active'?(v.eligible.includes(p.seat)?v.submitted.includes(p.seat)?'已投':'未投':v.excluded?.includes(p.seat)?'平票禁投':v.kind==='sheriff'?'上警 · 無警長票':'不參與'):(p.alive?'存活':'☠ 已出局');
- const candidate=g.stage.type==='election'&&g.election?.candidates.includes(p.seat);
+ const g=room.game,v=g.voting,selected=voteSelection===p.seat,canVote=voteAllowed(),status=v?.status==='active'?(v.eligible.includes(p.seat)?v.submitted.includes(p.seat)?'已投':'未投':v.excluded?.includes(p.seat)?'平票禁投':v.kind==='sheriff'?'本輪候選 · 無警長票':'不參與'):(p.alive?'存活':'☠ 已出局');
+ const candidate=g.stage.type==='election'&&(v?.kind==='sheriff'?v.candidates:g.election?.candidates)?.includes(p.seat);
  const content=`${candidate?'<span class="badge">上警</span>':''}<span class="player-seat">${String(p.seat).padStart(2,'0')} ${g.sheriff===p.seat?'<span class="badge" aria-label="警長">♔</span>':''}</span><strong class="player-name">${escapeHtml(p.name||'玩家 '+p.seat)}</strong>${host?`<span class="player-role">${p.role}</span>`:''}<span class="player-state">${p.alive?status:'☠ 已出局'}</span>${host&&v?.status==='active'?`<span class="player-tally">${v.counts?.[p.seat]||0} 票</span>`:''}`;
  if(!host)return `<button class="player-tile ${p.alive?'alive':'dead'} ${selected&&canVote?'selected':''}" data-action="g-select-vote" data-seat="${p.seat}" aria-label="${escapeHtml(seatLabel(p.seat))}，${p.alive?'存活':'已出局'}" aria-pressed="${selected&&canVote}" ${!p.alive||!canVote||(v?.kind==='sheriff'&&!v.candidates.includes(p.seat))?'disabled':''}>${content}${selected&&canVote?'<span class="selected-check">✓ 已選中</span>':''}</button>`;
  return `<article class="player-tile ${p.alive?'alive':'dead'}">${content}<div class="player-admin"><button class="${p.alive?'danger':'secondary'}" data-action="g-status" data-seat="${p.seat}" data-alive="${!p.alive}">${p.alive?'令其出局':'恢復存活'}</button><button class="text-button" data-action="g-sheriff" data-seat="${p.seat}" ${!p.alive||g.sheriff===p.seat||(g.stage.type==='election'&&['signup','voting'].includes(g.election?.status))?'disabled':''}>${g.sheriff===p.seat?'♔ 持有警徽':'授予警徽'}</button></div></article>`;
@@ -94,7 +94,7 @@ function gamePlayer(p,host){
 function playerVoteBar(){
  const v=room.game.voting;
  if(v?.status!=='active')return '';
- if(!voteAllowed())return `<div class="vote-submit locked">${room.self.alive===false?'已出局 · 僅可觀戰':!v.eligible.includes(room.self.seat)?(v.kind==='sheriff'?'上警玩家無警長票 · 等待投票結束':'平票禁投 · 等待本次重投結束'):`已投票（等待其他人）${v.ownVote===null?' · 已棄權':' · 本票計 '+(v.ownWeight??1)+' 票'}`}</div>`;
+ if(!voteAllowed())return `<div class="vote-submit locked">${room.self.alive===false?'已出局 · 僅可觀戰':!v.eligible.includes(room.self.seat)?(v.kind==='sheriff'?'本輪候選人無警長票 · 等待投票結束':'平票禁投 · 等待本次重投結束'):`已投票（等待其他人）${v.ownVote===null?' · 已棄權':' · 本票計 '+(v.ownWeight??1)+' 票'}`}</div>`;
  const privilege=v.kind!=='sheriff'&&room.game.sheriff===room.self.seat;
  return `${privilege?`<section class="control-panel"><h2>♔ 警徽特權</h2><p>本次放逐票：${sheriffPrivilege?'1.5':'1'} 票。提交前可切換，提交後鎖定。</p><div class="target-options"><button class="target-chip ${sheriffPrivilege?'selected':''}" data-action="g-privilege" data-value="yes" aria-pressed="${sheriffPrivilege}">是 · 1.5 票</button><button class="target-chip ${!sheriffPrivilege?'selected':''}" data-action="g-privilege" data-value="no" aria-pressed="${!sheriffPrivilege}">否 · 1 票</button></div></section>`:''}<div class="vote-submit"><strong>${voteSelection===undefined?'請選擇玩家或棄權':voteSelection===null?'已選擇棄權':`選中 ${voteSelection} 號玩家`}</strong><div><button class="secondary ${voteSelection===null?'selected':''}" data-action="g-abstain" aria-pressed="${voteSelection===null}">棄權</button><button class="primary" data-action="g-submit-vote" ${voteSelection===undefined?'disabled':''}>確認投票</button></div></div>`;
 }
@@ -136,7 +136,7 @@ function gameAction(button){
  else if(action==='g-settle-night')confirm('公布夜間結算',`確定公布${g.night.target?g.night.target+' 號出局':'平安夜'}？公布後所有玩家會看到存活狀態。`,'settle-night');
  else if(action==='g-status'){const alive=button.dataset.alive==='true';confirm(alive?'恢復存活':'手動出局',`確定將 ${seatLabel(seat)} 設為${alive?'存活':'出局'}嗎？${g.voting?.status==='active'?'這會將當前投票作廢，需重新發起。':''}`,'status',{seat,alive});}
  else if(action==='g-sheriff'||action==='g-clear-sheriff')confirm('警徽標記',action==='g-clear-sheriff'?'確定收回警徽？投票進行中會作廢本輪，需重新發起。':`確定授予 ${seatLabel(seat)} 警徽？投票進行中會作廢本輪，需重新發起。`,'sheriff',{seat:action==='g-clear-sheriff'?null:seat});
- else if(action==='g-start-vote')confirm('發起投票',g.stage.type==='election'?'重新開放警長投票，上警玩家沒有警長票，僅可投候選人。':`向具資格的存活玩家開放投票。${g.nextVoteExcluded?.length?'平票玩家 '+g.nextVoteExcluded.join('、')+' 號本次禁投，仍可被投。':''}新投票將取代上一輪結果。`,'start-vote');
+ else if(action==='g-start-vote')confirm('發起投票',g.stage.type==='election'?'重新開放警長投票。平票時僅並列最高票者為候選人、不可投票；其餘存活玩家各有一票，僅可投本輪候選人。':`向具資格的存活玩家開放投票。${g.nextVoteExcluded?.length?'平票玩家 '+g.nextVoteExcluded.join('、')+' 號本次禁投，仍可被投。':''}新投票將取代上一輪結果。`,'start-vote');
  else if(action==='g-end-vote')confirm('結束投票',`目前 ${g.voting.submitted.length} / ${g.voting.eligible.length} 人已投。確定結束並公布結果？未投玩家不計票。`,'end-vote');
  else if(action==='g-eliminate-vote')confirm('確認投票出局',`確定淘汰 ${seatLabel(g.voting.leaders[0])}？`,'eliminate-vote');
 }
@@ -147,7 +147,7 @@ function electionPanel(host){
  const seconds=Math.max(0,Math.ceil((e.deadline-Date.now()-serverOffset)/1000));
  if(e.status==='signup')return `<div class="election-panel"><h2>♔ 是否上警</h2><p>剩餘 <strong data-election-countdown>${seconds}</strong> 秒 · 超時預設「否」</p><p>已回覆 ${e.answered.length} / ${e.participants.length} 人</p><p>${!host&&Object.hasOwn(e,'ownChoice')?(e.ownChoice?'你已選擇上警，沒有警長票。':'你已選擇不上警，稍後可投警長票。'):'上警玩家成為候選人，其餘存活玩家每人一票。'}</p></div>`;
  const own= v&&Object.hasOwn(v,'ownVote');
- const info=host?`已投 ${v?.submitted.length||0} / ${v?.eligible.length||0} 人`:room.self.alive===false?'已出局，僅可觀戰':v?.status==='active'?!v.eligible.includes(room.self.seat)?'你已上警，本次沒有警長票。':own?`你已${v.ownVote===null?'棄權':'投給 '+v.ownVote+' 號'}，等待結算。`:'請選擇一位上警候選人，投出你的警長票。':'警長投票已結束。';
+ const info=host?`已投 ${v?.submitted.length||0} / ${v?.eligible.length||0} 人`:room.self.alive===false?'已出局，僅可觀戰':v?.status==='active'?!v.eligible.includes(room.self.seat)?'你是本輪候選人，本次沒有警長票。':own?`你已${v.ownVote===null?'棄權':'投給 '+v.ownVote+' 號'}，等待結算。`:'請選擇一位上警候選人，投出你的警長票。':'警長投票已結束。';
  return `<div class="election-panel"><h2>♔ 警長投票</h2><p>候選人：${(v?.candidates||e.candidates).map(n=>escapeHtml(seatLabel(n))).join('、')||'無人上警'}</p><p>${info}</p><p>票收齊後自動結算，唯一最高票者自動獲得警徽。</p>${host?(v?.status==='active'?'<button class="primary full" data-action="g-end-vote">結束警長投票</button>':e.candidates.length&&v?.eligible.length?'<button class="primary full" data-action="g-start-vote">重新發起警長投票</button>':'<p>無候選人或無投票者，可繼續下一階段或手動處理警徽。</p>'):''}</div>`;
 }
 function syncElectionDialog(){

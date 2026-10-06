@@ -281,9 +281,10 @@ test('sheriff ties, no candidates, all candidates and all abstentions never assi
   const retry = await f.act('start-vote');
   assert.equal(retry.room.game.sheriff, null);
   assert.deepEqual(retry.room.game.voting.candidates, [1, 2]);
-  assert.deepEqual(retry.room.game.voting.eligible, [4, 5, 6]);
-  assert.equal((await f.vote(3, 1)).status, 403);
+  assert.deepEqual(retry.room.game.voting.eligible, [3, 4, 5, 6]);
+  assert.equal((await f.vote(1, 2)).status, 403);
   assert.equal((await f.vote(4, 3)).status, 400);
+  assert.equal((await f.vote(3, null)).status, 200);
   await f.vote(4, null); await f.vote(5, null); await f.vote(6, null);
   assert.equal((await f.state()).room.game.sheriff, null);
   await f.act('start-vote'); await f.vote(4, 2);
