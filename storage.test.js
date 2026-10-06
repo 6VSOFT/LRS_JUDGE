@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleRequest, createDeck } from './lib/rooms.js';
+import { handleRequest, createDeck, roleNames } from './lib/rooms.js';
 import { MemoryStore } from './lib/memory-store.js';
 
 function client(store) {
@@ -102,14 +102,14 @@ test('every size 6 through 12 supports defaults and custom counts across deals',
     const roles = { 狼人: 2, 村民: size - 5, 預言家: 2, 女巫: 1, 獵人: 0, 守衛: 0 };
     const host = await api('create', { size, roles });
     assert.equal(host.status, 200);
-    assert.deepEqual(host.room.roleCounts, roles);
+    assert.deepEqual(host.room.roleCounts, Object.fromEntries(roleNames.map(role=>[role,roles[role]||0])));
     const code = host.room.code;
     const players = await Promise.all(Array.from({ length: size }, (_, i) => api('join', { code, seat: i + 1 })));
     assert.ok(players.every(p => p.status === 200));
     for (let round = 1; round <= 2; round++) {
       const state = round === 1 ? await api('state', { code }, host.token) : await api('redeal', { code, token: host.token });
       assert.equal(state.room.round, round);
-      assert.deepEqual(state.room.roleCounts, roles);
+      assert.deepEqual(state.room.roleCounts, Object.fromEntries(roleNames.map(role=>[role,roles[role]||0])));
       for (const [role, count] of Object.entries(roles)) {
         assert.equal(state.room.players.filter(p => p.role === role).length, count);
       }
@@ -145,4 +145,27 @@ test('existing rooms without a saved deck remain usable after deployment', async
   const redeal = await api('redeal', { code: host.room.code, token: host.token });
   assert.equal(redeal.room.phase, 'dealt');
   assert.deepEqual(redeal.room.players.map(p => p.role).sort(), createDeck(6).sort());
+});
+
+test('nine additional roles deal and redeal with special wolves counted as the wolf camp', async () => {
+  const api = client(new MemoryStore());
+  const extra = ['白痴', '騎士', '狼王', '白狼王', '魔術師', '攝夢人', '石像鬼', '守墓人', '機械狼'];
+  const roles = { ...Object.fromEntries(extra.map(role => [role, 1])), 村民: 3 };
+  const host = await api('create', { size: 12, roles });
+  assert.equal(host.status, 200);
+  const code = host.room.code;
+  const players = [];
+  for (let seat = 1; seat <= 12; seat++) players.push(await api('join', { code, seat }));
+  for (let round = 1; round <= 2; round++) {
+    const state = round === 1 ? await api('state', { code }, host.token) : await api('redeal', { code, token: host.token });
+    assert.deepEqual(state.room.players.map(p => p.role).sort(), [...extra, '村民', '村民', '村民'].sort());
+    const self = await api('state', { code }, players[0].token);
+    assert.ok(self.room.players.every(p => !p.role));
+    assert.equal(self.room.self.role, state.room.players[0].role);
+  }
+  for (const role of ['狼王', '白狼王', '石像鬼', '機械狼']) {
+    assert.equal((await api('create', { size: 6, roles: { [role]: 1, 村民: 5 } })).status, 200);
+    assert.equal((await api('create', { size: 6, roles: { [role]: 6 } })).status, 400);
+  }
+  assert.equal((await api('create', { size: 6, roles: { 白痴: 1, 騎士: 1, 魔術師: 1, 攝夢人: 1, 守墓人: 1, 村民: 1 } })).status, 400);
 });
