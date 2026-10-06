@@ -140,3 +140,40 @@ test('tie, no-vote, stale ballots, overrides, recovery and redeal are safe', asy
   assert.ok(redeal.room.players.every(p => p.alive && p.name));
   assert.equal((await f.api('stage', { code: f.code, token: f.host.token, round: old.round, revision: old.game.revision, direction: 1 })).status, 409);
 });
+
+test('highest tied players lose only the next revote ballot, remain targets, and survive recovery/cancellation', async () => {
+  const f = await fixture();
+  await f.day(); await f.act('start-vote');
+  await f.vote(3, 1); await f.vote(4, 2);
+  const ended = await f.act('end-vote');
+  assert.deepEqual(ended.room.game.nextVoteExcluded, [1, 2]);
+  const next = await f.act('start-vote');
+  assert.deepEqual(next.room.game.voting.eligible, [3, 4, 5, 6]);
+  assert.deepEqual(next.room.game.voting.excluded, [1, 2]);
+  assert.equal((await f.vote(1, 3)).status, 403);
+  assert.equal((await f.vote(2, null)).status, 403);
+  assert.deepEqual((await f.state(f.players[0].token)).room.game.voting.excluded, [1, 2]);
+  assert.equal((await f.vote(3, 1)).status, 200);
+  await f.act('status', { seat: 6, alive: false });
+  const restarted = await f.act('start-vote');
+  assert.deepEqual(restarted.room.game.voting.eligible, [3, 4, 5]);
+  await f.vote(3, 1); await f.act('end-vote');
+  assert.deepEqual((await f.act('start-vote')).room.game.voting.eligible, [1, 2, 3, 4, 5]);
+  await f.vote(3, 1); await f.vote(4, 2); await f.act('end-vote');
+  await f.act('stage', { direction: 1 }); await f.act('stage', { direction: 1 });
+  assert.deepEqual((await f.act('start-vote')).room.game.voting.eligible, [1, 2, 3, 4, 5]);
+});
+
+test('repeated ties replace excluded seats and all-tied or zero-vote rounds are handled', async () => {
+  const f = await fixture();
+  await f.day(); await f.act('start-vote');
+  await f.vote(1, 1); await f.vote(2, 2); await f.act('end-vote');
+  await f.act('start-vote');
+  await f.vote(3, 3); await f.vote(4, 4); await f.act('end-vote');
+  assert.deepEqual((await f.act('start-vote')).room.game.voting.eligible, [1, 2, 5, 6]);
+  await f.act('end-vote');
+  assert.deepEqual((await f.act('start-vote')).room.game.voting.eligible, [1, 2, 3, 4, 5, 6]);
+  for (let seat = 1; seat <= 6; seat++) await f.vote(seat, seat);
+  await f.act('end-vote');
+  assert.equal((await f.act('start-vote')).status, 400);
+});
