@@ -183,4 +183,4 @@
 - 刷新／重连恢复记录；阶段回退不恢复同一晚次数；重新发牌清空。旧房间缺少 inspections 时兼容。lib/roles.js 集中后端狼人阵营定义，由配置校验与技能共用。
 - npm test 24 项通过，新增 seer.test.js 覆盖 20 角色阵营、隐私、并发重复、无效目标、出局、日间／结算限制、旧请求、重连、回退与重发。浏览器验证选择、确认、结果、刷新锁定，截图 artifacts/seer-inspection.png。
 
-- 部署状态：功能提交 da343d5 已推送 main；75d4830 重新触发后仍被 Netlify 标记 Skipped（提示同分支另有部署排队）。截至本次验证，线上仍为 1a6a239，尚未上线预言家功能。Netlify 浏览器未登录，无法访问重新部署控制；下次登录后检查／重试部署，再验证 inspect API，不可仅凭 Git 推送声称上线。
+- 部署状态（2026-10-07 登录后核实）：预言家功能提交 da343d5 已推送 main，线上仍为 1a6a239。真实阻塞为团队本计费周期可用 credits 耗尽，Netlify 暂停 production deploys，Trigger deploy 按钮禁用；现有网站由 operational credits 维持在线。登录后的部署记录明确显示 Skipped due to account credit usage exceeded，取代此前未登录页面的通用排队提示。需要用户升级套餐或等待下一计费周期恢复额度后再发布；不要重复推送空提交，不要自行付费／升级。恢复后验证线上脚本与 inspect API。
