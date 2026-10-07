@@ -72,7 +72,7 @@ function gameScreen(){
  if(selectedVoteId!==v?.id){selectedVoteId=v?.id;voteSelection=undefined;sheriffPrivilege=true;}
  if(voteSelection!=null&&!room.players.some(p=>p.seat===voteSelection&&p.alive))voteSelection=undefined;
  if(!host&&room.self.alive===false)playerPanel='board';
- return `<section class="game-shell ${!host&&room.self.alive===false?'spectator':''}"><div class="game-meta"><span>${host?'法官全知視角':'玩家看板'} · 房間 ${room.code} · 第 ${room.round} 局</span><span>存活 ${alive} / ${room.size}</span></div><div class="phase-banner ${g.stage.type==='night'?'night-banner':''}"><div><span class="eyebrow">${host?'PHASE '+(g.step+1)+' / 13':'CURRENT PHASE'}</span><h1>${g.stage.label}</h1><p>${host?'全場底牌僅法官可見，請勿展示螢幕。':escapeHtml(seatLabel(room.self.seat))+(room.self.alive?' · 存活':' · 已出局，僅可觀戰')}</p></div><span class="phase-icon">${g.stage.type==='night'?'☾':g.stage.type==='election'?'♔':'☀'}</span></div>${host?hostControls():playerControls()}<div class="board-heading"><h2>${host?'全場玩家':'玩家列表'}</h2><span>♔ ${g.sheriff?escapeHtml(seatLabel(g.sheriff)):'尚未指定警長'}</span></div><div class="game-grid">${room.players.map(p=>gamePlayer(p,host)).join('')}</div>${!host?guardPanel()+idiotPanel()+wolfNightPanel()+seerPanel()+witchPanel()+playerVoteBar():''}${voteResult(v)}${host&&v?.status==='active'?voteSources(v):''}${host?`<details class="game-history"><summary>主持紀錄（${g.history.length}）</summary>${g.history.map(item=>`<p><small>${item.stage}</small> ${escapeHtml(item.text)}</p>`).join('')||'<p>尚無操作紀錄</p>'}</details><button class="secondary full" data-action="manage">重新發牌 / 解散房間</button>`:''}</section>`;
+ return `<section class="game-shell ${!host&&room.self.alive===false&&!g.hunter?.canShoot?'spectator':''}"><div class="game-meta"><span>${host?'法官全知視角':'玩家看板'} · 房間 ${room.code} · 第 ${room.round} 局</span><span>存活 ${alive} / ${room.size}</span></div><div class="phase-banner ${g.stage.type==='night'?'night-banner':''}"><div><span class="eyebrow">${host?'PHASE '+(g.step+1)+' / 13':'CURRENT PHASE'}</span><h1>${g.stage.label}</h1><p>${host?'全場底牌僅法官可見，請勿展示螢幕。':escapeHtml(seatLabel(room.self.seat))+(room.self.alive?' · 存活':g.hunter?.canShoot?' · 已出局，可發動槍殺':' · 已出局，僅可觀戰')}</p></div><span class="phase-icon">${g.stage.type==='night'?'☾':g.stage.type==='election'?'♔':'☀'}</span></div>${host?hostControls():playerControls()}<div class="board-heading"><h2>${host?'全場玩家':'玩家列表'}</h2><span>♔ ${g.sheriff?escapeHtml(seatLabel(g.sheriff)):'尚未指定警長'}</span></div><div class="game-grid">${room.players.map(p=>gamePlayer(p,host)).join('')}</div>${!host?hunterPanel()+guardPanel()+idiotPanel()+wolfNightPanel()+seerPanel()+witchPanel()+playerVoteBar():''}${voteResult(v)}${host&&v?.status==='active'?voteSources(v):''}${host?`<details class="game-history"><summary>主持紀錄（${g.history.length}）</summary>${g.history.map(item=>`<p><small>${item.stage}</small> ${escapeHtml(item.text)}</p>`).join('')||'<p>尚無操作紀錄</p>'}</details><button class="secondary full" data-action="manage">重新發牌 / 解散房間</button>`:''}</section>`;
 }
 function exclusionNotice(){const v=room.game.voting,seats=v?.status==='active'?v.excluded:room.game.nextVoteExcluded;return seats?.length?`<p class="notice">平票禁投：${seats.map(n=>escapeHtml(seatLabel(n))).join('、')}。${v?.status==='active'?'本次':'下次'}重投不可投票，仍可被投。</p>`:'';}
 function hostControls(){
@@ -82,7 +82,7 @@ function hostControls(){
 function playerControls(){
  const v=room.game.voting;
  if(room.game.stage.type==='election')return electionPanel(false);
- const text=room.self.alive===false?'你已出局，僅可觀戰。':v?.status==='active'&&!v.eligible.includes(room.self.seat)?'你是上一輪最高票平票玩家，本次重投暫停投票權，仍可被投。':v?.status==='active'?Object.hasOwn(v,'ownVote')?`您已${v.ownVote===null?'棄權':'投給 '+v.ownVote+' 號玩家'}，請等待法官結算。`:'請選擇你投出的玩家。可投自己，或選擇棄權。':'等待法官發起投票，當前點擊卡片不會投票。';
+ const text=room.self.alive===false?(room.game.hunter?.canShoot?'你已出局，可在下方發動一次槍殺；無法參與投票。':'你已出局，僅可觀戰。'):v?.status==='active'&&!v.eligible.includes(room.self.seat)?'你是上一輪最高票平票玩家，本次重投暫停投票權，仍可被投。':v?.status==='active'?Object.hasOwn(v,'ownVote')?`您已${v.ownVote===null?'棄權':'投給 '+v.ownVote+' 號玩家'}，請等待法官結算。`:'請選擇你投出的玩家。可投自己，或選擇棄權。':'等待法官發起投票，當前點擊卡片不會投票。';
  return `<div class="player-toolbar"><p role="status">${text}</p><button class="secondary" data-action="g-card" ${room.self.alive===false?'disabled':''}>查看我的底牌</button></div>`;
 }
 function gamePlayer(p,host){
@@ -96,6 +96,11 @@ function seerPanel(){
  const seer=room.game.seer;
  if(!seer)return '';
  return `<section class="control-panel seer-panel"><h2>✧ 預言家查驗</h2><p>每晚可查驗一名其他存活玩家，確認後不可更改。結果僅你可見。</p>${seer.canInspect?`<div class="target-options">${room.players.filter(p=>p.alive&&p.seat!==room.self.seat).map(p=>`<button class="target-chip" data-action="g-inspect" data-seat="${p.seat}">查驗 ${escapeHtml(seatLabel(p.seat))}</button>`).join('')}</div>`:`<p class="hint">${room.self.alive===false?'已出局，無法查驗。':room.game.stage.type!=='night'?'請等待下一個夜晚。':seer.results.some(r=>r.step===room.game.step)?'本晚已使用查驗。':'本晚已結算，無法查驗。'}</p>`}<div role="status">${seer.results.map(r=>`<p><strong>${stageLabels[r.step]} · ${escapeHtml(seatLabel(r.target))}：${escapeHtml(r.camp)}</strong></p>`).join('')||'<p class="hint">尚無查驗紀錄</p>'}</div></section>`;
+}
+function hunterPanel(){
+ const h=room.game.hunter;
+ if(!h)return '';
+ return `<section class="control-panel hunter-panel"><h2>⌖ 獵人槍殺</h2><p>被放逐、狼刀或奶穿出局後，可槍殺一名其他存活玩家，每局一次；被女巫毒殺不能開槍。</p>${h.canShoot?`<div class="target-options">${room.players.filter(p=>p.alive&&p.seat!==room.self.seat).map(p=>`<button class="target-chip" data-action="g-shoot" data-seat="${p.seat}">槍殺 ${escapeHtml(seatLabel(p.seat))}</button>`).join('')}</div>`:`<p role="status">${h.shot?'已使用槍殺：'+escapeHtml(seatLabel(h.shot.target)):h.cause==='poison'?'你被女巫毒殺，無法發動槍殺。':room.self.alive?'尚未出局，無法發動槍殺。':'本次出局不能發動槍殺。'}</p>`}</section>`;
 }
 function guardPanel(){
  const guard=room.game.guard;
@@ -157,6 +162,7 @@ function gameAction(button){
  if(action==='g-heal'||action==='g-poison'){const w=g.witch,kind=action==='g-heal'?'heal':'poison',target=Number(button.dataset.seat);if(!w?.canUse||!(kind==='heal'?w.healAvailable:w.poisonAvailable))return;confirm(kind==='heal'?'使用解藥':'使用毒藥',`確定對 ${seatLabel(target)} 使用${kind==='heal'?'解藥，豁免本晚刀人':'毒藥，夜間結算時淘汰'}？每局僅一次，本晚不能再用另一種藥水。`,'potion',{kind,target,step:g.step});return;}
  if(action==='g-night'){if(!room.host&&!g.wolfNight)return;run(()=>sendGame('select-night',{round:room.round,step:g.step,nightId:g.nightId,seat:Number(button.dataset.seat)}));return;}
  if(action==='g-reveal-idiot'){if(room.self?.role!=='白痴'||room.self.alive===false||g.revealedIdiots?.includes(room.self.seat))return;confirm('公開白痴身分','確定向全場公開你是白痴嗎？公開後本局無法撤回。','reveal-idiot');return;}
+ if(action==='g-shoot'){if(!g.hunter?.canShoot)return;const target=Number(button.dataset.seat);confirm('確認槍殺',`確定槍殺 ${seatLabel(target)}？對方立即出局，每局僅一次且不可撤銷。${g.voting?.status==='active'?'當前投票將作廢，需由法官重新發起。':''}`,'shoot',{target});return;}
  if(action==='g-guard'){if(!g.guard?.canGuard)return;const target=Number(button.dataset.seat);confirm('確認守護',`確定守護 ${seatLabel(target)}？本晚僅一次，確認後不能更改。`,'guard',{target,step:g.step,nightId:g.nightId});return;}
  if(!room.host)return;
  const seat=Number(button.dataset.seat);
