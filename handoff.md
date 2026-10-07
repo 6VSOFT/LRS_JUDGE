@@ -183,4 +183,9 @@
 - 刷新／重连恢复记录；阶段回退不恢复同一晚次数；重新发牌清空。旧房间缺少 inspections 时兼容。lib/roles.js 集中后端狼人阵营定义，由配置校验与技能共用。
 - npm test 24 项通过，新增 seer.test.js 覆盖 20 角色阵营、隐私、并发重复、无效目标、出局、日间／结算限制、旧请求、重连、回退与重发。浏览器验证选择、确认、结果、刷新锁定，截图 artifacts/seer-inspection.png。
 
-- 部署状态（2026-10-07 登录后核实）：预言家功能提交 da343d5 已推送 main，线上仍为 1a6a239。真实阻塞为团队本计费周期可用 credits 耗尽，Netlify 暂停 production deploys，Trigger deploy 按钮禁用；现有网站由 operational credits 维持在线。登录后的部署记录明确显示 Skipped due to account credit usage exceeded，取代此前未登录页面的通用排队提示。需要用户升级套餐或等待下一计费周期恢复额度后再发布；不要重复推送空提交，不要自行付费／升级。恢复后验证线上脚本与 inspect API。
+- 历史部署阻塞：2026-10-07 曾因团队 credits 耗尽暂停生产部署，登录后确认 Skipped due to account credit usage exceeded。此问题已解除，见下方成功发布记录。
+
+## Netlify 发布成功（2026-10-07）
+
+- 刷新控制台后生产部署按钮恢复可用，通过 Trigger deploy → Deploy project 手动发布 main，已发布提交 e7532c5（包含预言家查验）。部署 ID：6ac5dcf0269b4f3da69c3ae8，控制台显示 Published，构建及部署完成。
+- 线上 https://lrsjudge.netlify.app/app.js 已包含 seerPanel；独立线上测试房间验证 inspect 返回狼人阵营、同晚第二次请求 409、公开 lookup 无查验记录，随后解散测试房间。测试未接触真实玩家房间。截图 artifacts/netlify-published.png。
