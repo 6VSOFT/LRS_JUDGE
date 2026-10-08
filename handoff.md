@@ -320,3 +320,4 @@
 - 存活石像鬼每个尚未结算的夜晚可查验一名其他存活玩家，二次确认后返回具体真实角色名称，每晚一次，不可修改；白天、出局及已结算夜晚不可使用。兼容魔术师当晚号码映射，查验后禁止晚换牌。
 - lib/game.js 新增 inspect-role 操作与 gargoyleInspections 私密记录；校验 round/revision/step/nightId，CAS 防重复并发。game.gargoyle 仅本人获得 canInspect 和历史 results（step、target、role）；公开、法官与其他玩家不下发，重连保留、阶段回退不返还、重发清空。石像鬼不取得狼队友列表或狼刀操作权限。
 - public/app.js 新增绿白查验面板、确认、历史结果及角色说明。npm test 67 项通过；gargoyle.test.js 覆盖20角色具体名称、权限、一次性并发、隐私、恢复、回退、重发、过期请求及魔术师号码映射／行动顺序。浏览器验证查验确认、结果、锁定与刷新恢复，截图 artifacts/gargoyle-inspection.png。
+- 发布验证：d94f483 已推送 main 并上线 Netlify。线上独立测试房间验证具体身份结果、魔术师号码映射、每晚一次、刷新读取、公开／法官／其他玩家隐私、非夜晚禁用和重发清空；测试房间已解散。
