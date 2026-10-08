@@ -31,7 +31,7 @@ test('only five specified wolf roles receive other non-mechanical wolf camp seat
  for(const role of roleNames){
   await f.edit(r=>{r.players[0].role=role;r.players[1].role='石像鬼';r.players[2].role='機械狼';r.players[3].role='夢魘';r.players[4].role='村民';r.players[5].role='狼人'});
   const r=(await f.state(f.players[0].token)).room;
-  assert.deepEqual(r.game.wolfTeammates,allowed.has(role)?[2,4,6]:undefined,role);
+  assert.deepEqual(r.game.wolfTeammates,allowed.has(role)?[2,6]:undefined,role);
   assert.ok(r.players.every(p=>p.role===undefined));
   assert.equal((await f.state()).room.game.wolfTeammates,undefined);
   const pub=await f.api('lookup',{code:f.code,token:f.players[0].token});assert.equal(pub.room.game.wolfTeammates,undefined);

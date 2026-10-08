@@ -52,7 +52,7 @@ test('gargoyle checks once per night, keeps private results through recovery and
 test('gargoyle exact role covers all roles, validates permissions, settled nights and stale commands', async () => {
   const f = await fixture();
   for (const role of roleNames) {
-    await f.edit(r => { r.players[1].role = role; delete r.game.gargoyleInspections; });
+    await f.edit(r => { r.players[1].role = role; r.game.fears = role === '夢魘' ? {2:{0:{target:3}}} : {}; delete r.game.gargoyleInspections; });
     const result = await f.inspect(2);
     assert.equal(result.status, 200);
     assert.equal(result.room.game.gargoyle.results[0].role, role);

@@ -52,7 +52,7 @@ test('seer checks once per night, keeps private results through recovery and rol
 test('seer camp covers all roles, validates permissions, settled nights and stale commands', async () => {
   const f = await fixture();
   for (const role of roleNames) {
-    await f.edit(r => { r.players[1].role = role; delete r.game.inspections; });
+    await f.edit(r => { r.players[1].role = role; r.game.fears = role === '夢魘' ? {2:{0:{target:3}}} : {}; delete r.game.inspections; });
     const result = await f.inspect(2);
     assert.equal(result.status, 200);
     assert.equal(result.room.game.seer.results[0].camp, wolfRoles.has(role) ? '狼人陣營' : '好人陣營');
