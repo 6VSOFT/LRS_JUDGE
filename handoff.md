@@ -274,3 +274,5 @@
 - explode API 校验角色、存活、round/revision/step、昼夜、未使用及其他存活目标；CAS 原子更新双方出局与次数，防止重复带走。进行中的放逐／警长投票作废并提示重开，报名阶段仍在截止时过滤已出局候选。game.explosions 按白狼王座位保存 target/step，仅本人 game.whiteWolfKing 返回技能状态与结果；公开及其他角色不下发。
 - 双方 deaths.cause=explosion，不标记被抢杀，不触发猎人／狼王枪杀。刷新／回退／恢复存活不恢复次数，重发清空，旧房间缺字段兼容。
 - npm test 51 项通过，white-wolf-king.test.js 覆盖白天及警长阶段、双方同时出局、权限隐私、目标限制、夜晚／旧请求、并发、恢复重发、投票作废与枪杀限制；浏览器验证二次确认、双方出局、已用锁定，截图 artifacts/white-wolf-king-explosion.png。
+
+- 发布验证：a43d206 已推送 main 并上线 Netlify。线上独立测试房间验证夜晚禁用、白天双方出局、一次限制、公开隐私、被带走猎人不能开枪与重发清空。测试房间已解散。
