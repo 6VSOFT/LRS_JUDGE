@@ -93,3 +93,21 @@ test('white wolf king cannot shoot; wolf king killed by duel or shot cannot shoo
   assert.equal((await shoot(f,4)).status,403);
  }
 });
+
+test('shot victims share an anonymous public label for hunter and wolf king; restore/redeal clear it', async () => {
+ for(const role of ['獵人','狼王']){
+  const f=await fixture(role);await f.act('night',{seat:1});await f.act('settle-night');await shoot(f,4);
+  for(const token of [f.players[3].token,f.players[4].token]){
+   const {room:r}=await f.state(token);
+   assert.deepEqual(r.game.shotDeaths,[4]);assert.equal(r.players[3].alive,false);
+   assert.equal(r.game.history,undefined);assert.equal(r.game.hunter,undefined);
+   assert.equal(r.game.hunterShots,undefined);assert.equal(r.game.deaths,undefined);
+   assert.ok(r.players.every(p=>p.role===undefined));
+  }
+  assert.deepEqual((await f.api('lookup',{code:f.code})).room.game.shotDeaths,[4]);
+  assert.deepEqual((await f.state()).room.game.shotDeaths,[4]);
+  await f.act('status',{seat:4,alive:true});assert.deepEqual((await f.state()).room.game.shotDeaths,[]);
+  await f.act('status',{seat:4,alive:false});assert.deepEqual((await f.state()).room.game.shotDeaths,[]);
+  await f.api('redeal',{code:f.code,token:f.host.token});assert.deepEqual((await f.state()).room.game.shotDeaths,[]);
+ }
+});
