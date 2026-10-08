@@ -5,7 +5,7 @@ const defaults={6:{狼人:2,村民:2,預言家:1,女巫:1,獵人:0,守衛:0},7:{
 const roleNames=['狼人','村民','預言家','女巫','獵人','守衛','白痴','騎士','狼王','白狼王','魔術師','攝夢人','石像鬼','守墓人','機械狼','狼美人','夢魘','血月使徒','獵魔人','通靈師'];
 const wolfRoles=new Set(['狼人','狼王','白狼王','石像鬼','機械狼','狼美人','夢魘','血月使徒']);
 for(const preset of Object.values(defaults))for(const role of roleNames)preset[role]??=0;
-Object.assign(descriptions,{白痴:['☉','神職角色，放逐時的特殊效果依本局桌規執行'],騎士:['⚔','白天可決鬥一次：狼人出局，好人則自己出局'],狼王:['♛','狼人陣營，出局技能依本局桌規執行'],白狼王:['♕','狼人陣營，自爆帶人效果依本局桌規執行'],魔術師:['✦','神職角色，夜間交換效果由法官依桌規結算'],攝夢人:['☽','神職角色，夜間攝夢效果由法官依桌規結算'],石像鬼:['♟','狼人陣營，查驗及行動規則依本局桌規執行'],守墓人:['⚰','神職角色，獲取放逐資訊的規則依本局桌規執行'],機械狼:['⚙','狼人陣營，學習技能與行動規則依本局桌規執行']});
+Object.assign(descriptions,{白痴:['☉','神職角色，放逐時的特殊效果依本局桌規執行'],騎士:['⚔','白天可決鬥一次：狼人出局，好人則自己出局'],狼王:['♛','被放逐、狼刀或奶穿出局可槍殺一次；毒殺不能開槍'],白狼王:['♕','狼人陣營，自爆帶人效果依本局桌規執行'],魔術師:['✦','神職角色，夜間交換效果由法官依桌規結算'],攝夢人:['☽','神職角色，夜間攝夢效果由法官依桌規結算'],石像鬼:['♟','狼人陣營，查驗及行動規則依本局桌規執行'],守墓人:['⚰','神職角色，獲取放逐資訊的規則依本局桌規執行'],機械狼:['⚙','狼人陣營，學習技能與行動規則依本局桌規執行']});
 Object.assign(descriptions,{狼美人:['❦','狼人陣營，魅惑效果依本局桌規由法官結算'],夢魘:['☾','狼人陣營，夜間技能依本局桌規由法官結算'],血月使徒:['◐','狼人陣營，特殊技能依本局桌規由法官結算'],獵魔人:['⚔','神職角色，狩獵效果依本局桌規由法官結算'],通靈師:['✧','神職角色，查驗資訊依本局桌規由法官提供']});
 let roleConfig={...defaults[9]};
 function summarize(counts){const wolf=roleNames.filter(role=>wolfRoles.has(role)).reduce((sum,role)=>sum+(counts[role]||0),0),civilian=counts.村民||0,god=roleNames.filter(role=>role!=='村民'&&!wolfRoles.has(role)).reduce((sum,role)=>sum+(counts[role]||0),0);return `${wolf} 狼 · ${god} 神 · ${civilian} 民`;}
@@ -105,7 +105,7 @@ function knightPanel(){
 function hunterPanel(){
  const h=room.game.hunter;
  if(!h)return '';
- return `<section class="control-panel hunter-panel"><h2>⌖ 獵人槍殺</h2><p>被放逐、狼刀或奶穿出局後，可槍殺一名其他存活玩家，每局一次；被女巫毒殺不能開槍。</p>${h.canShoot?`<div class="target-options">${room.players.filter(p=>p.alive&&p.seat!==room.self.seat).map(p=>`<button class="target-chip" data-action="g-shoot" data-seat="${p.seat}">槍殺 ${escapeHtml(seatLabel(p.seat))}</button>`).join('')}</div>`:`<p role="status">${h.shot?'已使用槍殺：'+escapeHtml(seatLabel(h.shot.target)):h.cause==='poison'?'你被女巫毒殺，無法發動槍殺。':room.self.alive?'尚未出局，無法發動槍殺。':'本次出局不能發動槍殺。'}</p>`}</section>`;
+ return `<section class="control-panel hunter-panel"><h2>⌖ ${escapeHtml(room.self.role)}槍殺</h2><p>被放逐、狼刀或奶穿出局後，可槍殺一名其他存活玩家，每局一次；被女巫毒殺不能開槍。</p>${h.canShoot?`<div class="target-options">${room.players.filter(p=>p.alive&&p.seat!==room.self.seat).map(p=>`<button class="target-chip" data-action="g-shoot" data-seat="${p.seat}">槍殺 ${escapeHtml(seatLabel(p.seat))}</button>`).join('')}</div>`:`<p role="status">${h.shot?'已使用槍殺：'+escapeHtml(seatLabel(h.shot.target)):h.cause==='poison'?'你被女巫毒殺，無法發動槍殺。':room.self.alive?'尚未出局，無法發動槍殺。':'本次出局不能發動槍殺。'}</p>`}</section>`;
 }
 function guardPanel(){
  const guard=room.game.guard;
