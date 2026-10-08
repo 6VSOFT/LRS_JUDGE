@@ -28,7 +28,7 @@ const server = http.createServer(async (req, res) => {
       res.end(Buffer.from(await response.arrayBuffer()));
       return;
     }
-    const files = { '/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css' };
+    const files = { '/': 'index.html', '/app.js': 'app.js', '/flow-guide.js': 'flow-guide.js', '/style.css': 'style.css' };
     const file = files[url.pathname];
     if (!file) { res.writeHead(404); res.end('Not found'); return; }
     res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8');
