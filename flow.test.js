@@ -58,8 +58,8 @@ test('13-stage flow, election, bounds and stale host commands are enforced', asy
     assert.equal(s.room.game.step, step);
     assert.deepEqual(s.room.game.stage, stages[step]);
   }
-  assert.equal((await f.act('stage', { direction: 1 })).status, 400);
-  assert.equal((await f.act('stage', { direction: -1 })).room.game.step, 11);
+  assert.equal((await f.act('stage', { direction: 1 })).room.game.stage.label, '第 7 晚');
+  assert.equal((await f.act('stage', { direction: -1 })).room.game.step, 12);
   const denied = await f.api('status', { code: f.code, token: f.players[0].token, round: 1, revision: 0, seat: 2, alive: false });
   assert.equal(denied.status, 403);
 });
