@@ -26,12 +26,12 @@ async function fixture() {
 
 
 
-test('only five specified wolf roles receive all other wolf camp seats without concrete roles',async()=>{
+test('only five specified wolf roles receive other non-mechanical wolf camp seats without concrete roles',async()=>{
  const f=await fixture();const allowed=new Set(['狼人','狼王','白狼王','狼美人','血月使徒']);
  for(const role of roleNames){
   await f.edit(r=>{r.players[0].role=role;r.players[1].role='石像鬼';r.players[2].role='機械狼';r.players[3].role='夢魘';r.players[4].role='村民';r.players[5].role='狼人'});
   const r=(await f.state(f.players[0].token)).room;
-  assert.deepEqual(r.game.wolfTeammates,allowed.has(role)?[2,3,4,6]:undefined,role);
+  assert.deepEqual(r.game.wolfTeammates,allowed.has(role)?[2,4,6]:undefined,role);
   assert.ok(r.players.every(p=>p.role===undefined));
   assert.equal((await f.state()).room.game.wolfTeammates,undefined);
   const pub=await f.api('lookup',{code:f.code,token:f.players[0].token});assert.equal(pub.room.game.wolfTeammates,undefined);
@@ -48,7 +48,7 @@ test('teammate seats persist across day/death/number swaps and refresh; redeal r
  await f.act('redeal');const host=(await f.state()).room;
  for(let i=0;i<6;i++){
   const r=(await f.state(f.players[i].token)).room;
-  const expected=host.players.filter(p=>p.seat!==i+1&&wolfRoles.has(p.role)).map(p=>p.seat);
+  const expected=host.players.filter(p=>p.seat!==i+1&&p.role!=='機械狼'&&wolfRoles.has(p.role)).map(p=>p.seat);
   assert.deepEqual(r.game.wolfTeammates,['狼人','狼王','白狼王','狼美人','血月使徒'].includes(r.self.role)?expected:undefined);
  }
  await f.edit(r=>r.players.forEach((p,i)=>p.role=i?'村民':'狼人'));
