@@ -43,6 +43,11 @@ export const flowGuide = `
 <h4>石像鬼与守墓人</h4><p><strong>夜晚：</strong><br>守墓人为第一行动位；之后正常推进流程；石像鬼为最末行动位；</p>
 <h4>混血儿</h4><p><strong>夜晚：</strong><br>混血儿首晚为第一行动位，选择一位玩家崇拜；之后正常推进流程；</p>
 <h4>魔术师</h4><p>魔术师在<strong>每天夜间最先睁眼</strong>，选择并交换两名玩家的号码牌，其技能结算和行动顺序有严格的流程规范</p>
+<h4>12人狼王魔术师：</h4>
+<ul>
+<li><strong>狼人阵营：4人</strong>（狼人×3 + 狼王×1）</li>
+<li><strong>好人阵营：8人</strong>（平民×4 + 预言家×1 + 女巫×1 + 猎人×1 + 魔术师×1）</li>
+</ul>
 `;
 
 export function showFlowGuide(onClose) {
