@@ -107,5 +107,5 @@ test('mechanical learning uses mapped role, prevents late swap, and unsupported 
  const f=await fixture();await f.edit(r=>r.players[5].role='魔術師');await act(f,'swap',6,{targets:[2,4]});
  assert.equal((await skill(f,'learn',2)).room.game.mechanical.learn.role,'女巫');
  const after=await fixture();await after.edit(r=>r.players[5].role='魔術師');await skill(after,'learn',2);assert.equal((await act(after,'swap',6,{targets:[3,4]})).status,409);
- const no=await learned('村民');await nextNight(no);for(const kind of ['inspect','poison','guard','knife'])assert.equal((await skill(no,kind,3)).status,403);assert.equal((await skill(no,'learn',3)).status,409);
+ const no=await learned('村民');assert.equal((await view(no)).mechanical.canLearn,false);await nextNight(no);const noSkills=await view(no);for(const flag of ['canInspect','canPoison','canGuard','canKnife'])assert.equal(noSkills.mechanical[flag],false);assert.equal(noSkills.hunter,undefined);for(const kind of ['inspect','poison','guard','knife'])assert.equal((await skill(no,kind,3)).status,403);assert.equal((await skill(no,'learn',3)).status,409);
 });
